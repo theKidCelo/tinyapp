@@ -16,5 +16,8 @@
   "bugs": {
     "url": "https://github.com/theKidCelo/tinyapp/issues"
   },
-  "homepage": "https://github.com/theKidCelo/tinyapp#readme"
+  "homepage": "https://github.com/theKidCelo/tinyapp#readme",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
 }
