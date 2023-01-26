@@ -55,6 +55,19 @@ app.get("/urls/:id", (req, res) => {
     res.redirect("/urls");
   });
 
+  app.post("/urls/:id/update", (req, res) => {
+
+    console.log(req.body)
+    urlDatabase[req.params.id] = req.body.Link;
+    res.redirect("/urls");
+  });
+
+  app.post("/login", (req, res) => {
+    console.log(req.body)
+    res.cookie("username" , req.body.username)
+    res.redirect("/urls");
+  })
+
 
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
