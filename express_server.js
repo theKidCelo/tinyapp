@@ -10,10 +10,47 @@ app.set("view engine", "ejs");
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser())
 
+function generateRandomString() {
+    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    const length = 6;
+    let randomString = "";
+    let randomNumber;
+  
+    for (let i = 0; i < length; i++) {
+      randomNumber = Math.floor(Math.random() * characters.length);
+      randomString += characters[randomNumber];
+    }
+    return randomString
+  };
+
+  function exisitingEmailLookup(email) {
+    //loop through database
+    for (const user in users) {
+      if (email === users[user].email) {
+        return users[user];
+      }
+    }
+    return null;
+  };
+
+
 const urlDatabase = {
   "b2xVn2": "http://www.lighthouselabs.ca",
   "9sm5xK": "http://www.google.com"
 };
+
+const users = {
+    userRandomID: {
+      id: "userRandomID",
+      email: "user@example.com",
+      password: "purple-monkey-dinosaur",
+    },
+    user2RandomID: {
+      id: "user2RandomID",
+      email: "user2@example.com",
+      password: "dishwasher-funk",
+    },
+  };
 
 app.get("/", (req, res) => {
   res.send("Hello!");
@@ -30,7 +67,7 @@ app.get("/hello", (req, res) => {
 app.get("/urls", (req, res) => {
     const templateVars = {
         urls: urlDatabase,
-        username: req.cookies['username']
+        user: req.cookies['user_id']
       };
 
     res.render("urls_index", templateVars);
@@ -41,21 +78,29 @@ app.get("/u/:id", (req, res) => {
     const templateVars = {
         id: req.params.id,
         longURL: urlDatabase[req.params.id],
-        username: req.cookies['username']
+        user: req.cookies['username']
       };
     res.redirect(longURL, templateVars);
   });
 
 app.get("/urls/new", (req, res) => {
     const templateVars = {
-        username: req.cookies['username']
+        user: req.cookies['user_id']
       }
+
     res.render("urls_new", templateVars);
+    
   });
 
 app.get("/urls/:id", (req, res) => {
-    const templateVars = { id: req.params.id, longURL: urlDatabase[req.params.id]};
+  const templateVars = {
+    id: req.params.id,
+    longURL: urlDatabase[req.params.id],
+    user: users[req.cookies['user_id']]
+  };
+
     res.render("urls_show", templateVars);
+
   });
 
   app.post("/urls", (req, res) => {
@@ -75,18 +120,72 @@ app.get("/urls/:id", (req, res) => {
     res.redirect("/urls");
   });
 
+  app.get('/login', (req, res) => {
+    let templateVars = {
+      user: users[req.cookies['user_id']]
+    };
+    res.render('login', templateVars)
+  });
+
   app.post("/login", (req, res) => {
-  
-    res.cookie("username", req.body.username);
-    console.log(req.body)
-    
-    res.redirect("/urls");
+    const userEmail = req.body.email
+    const userPassword = req.body.password
+
+    if (userEmail === '' || userPassword === '') {
+      res.status(400);
+      res.send('400 Bad request: Please enter a valid email and password');
+    }
+
+    for (let user in users) {
+
+      if (userPassword === users[user].password && userEmail === users[user].email) {
+        res.cookie("user_id", user)
+        res.redirect('/urls');
+      } else if (userEmail !== users[user].email) {
+        res.status(403)
+        res.send("Error 403 Forbidden: Email does not exist. Please try again.")
+      } else if (userPassword !== users[user].password) {
+        res.status(403)
+        res.send("Error 403 Forbidden: Incorrect password. Please try again.")
+      }
+    }
+
   })
 
   app.post("/logout", (req, res) => {
-    res.clearCookie("username")
+    res.clearCookie("user_id")
     res.redirect('/urls')
   })
+
+  app.get("/register", (req, res) => {
+    const templateVars = {
+        urls: urlDatabase,
+        user: req.cookies['user_id']
+      };
+    res.render("register", templateVars)
+  })
+
+  app.post('/register', (req, res) => {
+
+    if (req.body.email === '' || req.body.password === '') {
+      res.status(400)
+      res.send('404 Error: Please enter a valid email and password.');
+    } else if (exisitingEmailLookup(req.body.email)) {
+      res.status(400);
+      res.send("400: Email associated with existing account.")
+    } else {
+      const userID = generateRandomString();
+      users[userID] = {
+        id: userID,
+        email: req.body.email,
+        password: req.body.password
+      };
+
+      res.cookie('user_id', userID);
+      res.redirect('/urls');
+    }
+  
+  });
 
 
 app.listen(PORT, () => {
