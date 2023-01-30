@@ -33,18 +33,18 @@
         </thead>
         <tbody>
       
-          <% for (let id in urls) { %>
+          <% for (let id of urls) { %>
             <tr>  
                 
-                    <td><%= id %></td>
-                    <td><%= urls[id] %></td>
+                    <td><%= id[0] %></td>
+                    <td><%= id[1] %></td>
 
-                    <form method="GET" action="/urls/<%= id %>">
+                    <form method="GET" action="/urls/<%= id[0] %>">
                         <td><button>Edit</button></td>
                     </form>
               
 
-                <form method="POST" action="/urls/<%= id %>/delete">
+                <form method="POST" action="/urls/<%= id[0] %>/delete">
                     <td><button>Delete</button></td>
                 </form>
             </tr>

@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 const PORT = 8080; // default port 8080
 const cookieParser = require('cookie-parser')
+const bcrypt = require("bcryptjs");
 
 function generateRandomString() {}
 
@@ -23,7 +24,7 @@ function generateRandomString() {
     return randomString
   };
 
-  function exisitingEmailLookup(email) {
+function exisitingEmailLookup(email) {
     //loop through database
     for (const user in users) {
       if (email === users[user].email) {
@@ -34,23 +35,45 @@ function generateRandomString() {
   };
 
 
+
 const urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
+  "b2xVn2": {
+    longURL: "http://www.lighthouselabs.ca",
+    userID: "userRandomID",
+  },
+
+  "9sm5xK": {
+    longURL: "http://www.google.com",
+    userID: "userRandomID",
+  }
 };
 
+function urlsForUser(id){
+  let URLS = []
+
+  for(let url in urlDatabase){
+    if(urlDatabase[url].userID === id){
+
+      URLS.push([url, urlDatabase[url].longURL])
+    }
+  }
+
+  return URLS
+}
+
+
 const users = {
-    userRandomID: {
-      id: "userRandomID",
-      email: "user@example.com",
-      password: "purple-monkey-dinosaur",
-    },
-    user2RandomID: {
-      id: "user2RandomID",
-      email: "user2@example.com",
-      password: "dishwasher-funk",
-    },
-  };
+  userRandomID: {
+    id: "userRandomID",
+    email: "user@example.com",
+    password: "purple-monkey-dinosaur",
+  },
+  user2RandomID: {
+    id: "user2RandomID",
+    email: "user2@example.com",
+    password: "dishwasher-funk",
+  },
+};
 
 app.get("/", (req, res) => {
   res.send("Hello!");
@@ -65,27 +88,49 @@ app.get("/hello", (req, res) => {
   });
 
 app.get("/urls", (req, res) => {
+  let user = req.cookies['user_id']
+  console.log(users)
+
+
+
     const templateVars = {
-        urls: urlDatabase,
-        user: req.cookies['user_id']
+        user,
+        urls: urlsForUser(user)
+     
       };
+
+   console.log(templateVars.user)
+
 
     res.render("urls_index", templateVars);
   });
 
 app.get("/u/:id", (req, res) => {
+  let ID = req.params.id
     // const longURL = ...
+    console.log(urlDatabase.ID)
+    if(urlDatabase.ID == undefined){
+      res.send("does not work")
+    }
     const templateVars = {
-        id: req.params.id,
-        longURL: urlDatabase[req.params.id],
-        user: req.cookies['username']
+        id: ID,
+        longURL: urlsForUser[ID].longURL,
+        user: req.cookies['user_id']
       };
+
+
+
     res.redirect(longURL, templateVars);
   });
 
 app.get("/urls/new", (req, res) => {
+  console.log("new")
     const templateVars = {
         user: req.cookies['user_id']
+      }
+
+      if(!templateVars.user){
+        return res.render("login", templateVars)
       }
 
     res.render("urls_new", templateVars);
@@ -93,6 +138,18 @@ app.get("/urls/new", (req, res) => {
   });
 
 app.get("/urls/:id", (req, res) => {
+  console.log("agshshtsahywrhtswrY", req.params.id)
+  let ID = req.params.id
+
+  if(urlDatabase[ID] === undefined){
+    res.send("does not work")
+  }
+  if(users[req.cookies['user_id']] === undefined){
+    res.send("Log in")
+  }
+  if(users[!req.cookies['user_id']]){
+    res.send("user not loged in")
+  }
   const templateVars = {
     id: req.params.id,
     longURL: urlDatabase[req.params.id],
@@ -104,12 +161,24 @@ app.get("/urls/:id", (req, res) => {
   });
 
   app.post("/urls", (req, res) => {
-    console.log(req.body); // Log the POST request body to the console
+    console.log(users); // Log the POST request body to the console
     res.send("Ok"); // Respond with 'Ok' (we will replace this)
   });
 
   app.post("/urls/:id/delete", (req, res) => {
-    delete urlDatabase[req.params.id]
+    let ID = req.params.id
+
+    if(urlDatabase[ID] === undefined){
+      res.send("does not work")
+    }
+    if(!req.cookies['user_id']  === undefined){
+      res.send("Log in")
+    }
+    if(!users[req.cookies['user_id']]){
+      res.send("user not loged in")
+    } else {
+      delete urlDatabase[req.params.id]
+    }
     res.redirect("/urls");
   });
 
@@ -124,31 +193,41 @@ app.get("/urls/:id", (req, res) => {
     let templateVars = {
       user: users[req.cookies['user_id']]
     };
+
+    if (templateVars.user) {
+      return res.redirect("/urls");
+    }
+
     res.render('login', templateVars)
   });
 
   app.post("/login", (req, res) => {
-    const userEmail = req.body.email
-    const userPassword = req.body.password
-
+    const formPassword = req.body.password;
+    const hashedPassword = bcrypt.hashSync(formPassword, 10);
+    const userEmail = req.body.email;
+    const userPassword = req.body.password;
     if (userEmail === '' || userPassword === '') {
       res.status(400);
       res.send('400 Bad request: Please enter a valid email and password');
     }
-
-    for (let user in users) {
-
-      if (userPassword === users[user].password && userEmail === users[user].email) {
-        res.cookie("user_id", user)
+  // email and password need to match whats in data base 
+    for (const i in users) {
+      console.log("this ran")
+      console.log(users[i].email)
+      if ( bcrypt.compareSync(userPassword, hashedPassword) && userEmail === users[i].email) {
+        res.cookie("user_id", i)
         res.redirect('/urls');
-      } else if (userEmail !== users[user].email) {
+      } else if (userEmail !== users[i].email) {
         res.status(403)
         res.send("Error 403 Forbidden: Email does not exist. Please try again.")
-      } else if (userPassword !== users[user].password) {
+      } else if (userPassword != users[i].password) {
         res.status(403)
         res.send("Error 403 Forbidden: Incorrect password. Please try again.")
       }
     }
+  //if all else fails:
+  console.log("failed")
+  return res.status(403);
 
   })
 
@@ -162,25 +241,33 @@ app.get("/urls/:id", (req, res) => {
         urls: urlDatabase,
         user: req.cookies['user_id']
       };
+
+      if (templateVars.user) {
+        return res.redirect("/urls");
+      }
+
     res.render("register", templateVars)
   })
 
   app.post('/register', (req, res) => {
-
     if (req.body.email === '' || req.body.password === '') {
       res.status(400)
       res.send('404 Error: Please enter a valid email and password.');
-    } else if (exisitingEmailLookup(req.body.email)) {
+    }
+    else if (exisitingEmailLookup(req.body.email)) {
       res.status(400);
       res.send("400: Email associated with existing account.")
-    } else {
+    }
+    else {
+      const password = req.body.password;
+      const hashedPassword = bcrypt.hashSync(password, 10);
       const userID = generateRandomString();
       users[userID] = {
         id: userID,
         email: req.body.email,
-        password: req.body.password
+        password: hashedPassword
       };
-
+      console.log(users[userID].email)
       res.cookie('user_id', userID);
       res.redirect('/urls');
     }
