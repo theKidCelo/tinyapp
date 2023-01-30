@@ -25,13 +25,13 @@
                 <div> 
                   <a class="nav-item nav-link" href="/register">Regester  </a>
                   <a class="nav-item nav-link" href="/login">Login  </a>
-                
+                  
                 </div>
               </form>
               <% } else { %>
               <form class="form-inline my-1" action="/logout" method="post">
                 <div>
-                  Hi: <%= user %>
+                  Hi: <%= user.email %>
                   <button type="submit">Logout</button>
                 </div>
               </form>
