@@ -47,11 +47,7 @@ let users = {
 };
 
 app.get("/", (req, res) => {
-  const templateVars = {
-    user: users[req.session.user_id],
-  };
-
-  res.redirect(longURL, templateVars);
+  res.redirect("/urls");
 })
 
 app.get("/urls", (req, res) => {
@@ -196,17 +192,18 @@ app.post("/login", (req, res) => {
 
   if (userEmail === "" || userPassword === "") {
     res.status(400);
-    res.send("error_");
+    return res.send("please fill in the form");
   }
 
   if (user === undefined) {
-    res.send("error_");
-  } else if (bcrypt.compareSync(user.password, hashedPassword) && user) {
+    return res.send("user does not exist");
+  } else if (bcrypt.compareSync(userPassword, user.password) && user) {
     req.session.user_id = user.id;
     return res.redirect("/urls");
   }
 
-  return res.status(403);
+  res.status(403);
+  return res.send("Password is incorrect, please try again.")
 });
 
 app.post("/logout", (req, res) => {
