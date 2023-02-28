@@ -25,11 +25,11 @@ app.use(
 const urlDatabase = {
   b6UTxQ: {
     longURL: "https://www.tsn.ca",
-    userID: "aJ48lW",
+    userID: "userRandomID",
   },
   i3BoGr: {
     longURL: "https://www.google.ca",
-    userID: "aJ48lW",
+    userID: "user2RandomID",
   },
 };
 console.log(urlDatabase)
@@ -54,7 +54,7 @@ app.get("/", (req, res) => {
 app.get("/urls", (req, res) => {
   const userID = req.session.user_id;
   const user = users[userID];
-  const templateVars = { user: user, urls: urlsForUser(userID) };
+  const templateVars = { user: user, urls: urlsForUser(userID, urlDatabase) };
   console.log(urlsForUser(userID))
 
  if (!user) {
@@ -62,19 +62,6 @@ app.get("/urls", (req, res) => {
   }
 
   return res.render("urls_index", templateVars);
-  /*
-  const userID = req.session.user_id;
-  const user = users[userID];
-
- 
-
-  const templateVars = {
-    user: users[user],
-    urls: urlsForUser(user, urlDatabase),
-  };
-
-  res.render("urls_index", templateVars);
-  */
 });
 
 app.get("/u/:id", (req, res) => {
@@ -82,36 +69,15 @@ app.get("/u/:id", (req, res) => {
   const user = users[userID];
   const templateVars = { user: user };
 
-  // short link does not exist
-  if (!urlDatabase[req.params.shortURL]) {
-    return res.render("pages/urls_error_linkDNE", templateVars);
-  }
 
-  // The user can create a short link with http:// prefixed or not
-  // The code below is to accomodate this and to avoid errors upon redirecting
   const regex = new RegExp("^http");
   const longURLRedirect = urlDatabase[req.params.shortURL].longURL;
 
-  // Check if the longURL in the database starts with http://
   if (regex.test(longURLRedirect)) {
     return res.redirect(`${longURLRedirect}`);
   } else {
     return res.redirect(`http://${longURLRedirect}`);
   }
-  /*
-  let ID = req.params.id;
-
-  if (urlDatabase.ID == undefined) {
-    res.send("error_DNE");
-  }
-  const templateVars = {
-    id: ID,
-    longURL: urlsForUser[ID].longURL,
-    user: users[req.session.user_id],
-  };
-
-  res.redirect(longURL, templateVars);
-  */
 });
 
 app.get("/urls/new", (req, res) => {
@@ -133,12 +99,11 @@ app.post("/urls", (req, res) => {
   if (!user) {
     return res.redirect("/login");
   }
-  console.log(urlDatabase)
+
   const shortURL = generateRandomString();
   urlDatabase[shortURL] = {};
   urlDatabase[shortURL].longURL = req.body.longURL;
   urlDatabase[shortURL].userID = userID;
-  console.log(urlDatabase)
 
   return res.redirect(`/urls/${shortURL}`);
 });
@@ -147,18 +112,19 @@ app.get("/urls/:id", (req, res) => {
   let ID = req.params.id;
 
   if (urlDatabase[ID] === undefined) {
-    res.send("error_DNE");
+    res.send("error this link does not exist");
   }
   if (users[req.session.user_id] === undefined) {
-    res.send("error_login");
+    res.send("error please login");
   }
   if (!users[req.session.user_id]) {
-    res.send("error_login");
+    res.send("error please login");
   }
   const templateVars = {
     id: req.params.id,
     longURL: req.params.longURL,
     user: users[req.session.user_id],
+
   };
 
   res.render("urls_show", templateVars);
@@ -169,12 +135,16 @@ app.post("/urls/:id", (req, res) => {
   const user = users[userID];
   const URLsBelongingToUser = urlsForUser(userID, urlDatabase);
 
-  const templateVars = { user };
+  const templateVars = {
+    user: user,
+    shortURL: req.params.id,
+    longURL: urlDatabase,
+  };
 
   if (!user || !URLsBelongingToUser) {
-    return res.render("pages/urls_error_linkOwner", templateVars);
+    return res.send("This link does not belong to user. please log in.")
   } else {
-    urlDatabase[req.params.shortURL].longURL = req.body.longURL;
+    urlDatabase[req.params.id].longURL = req.body.longURL;
     console.log(urlDatabase)
 
     return res.redirect("/");
@@ -187,13 +157,13 @@ app.post("/urls/:id/delete", (req, res) => {
   let ID = req.params.id;
 
   if (urlDatabase[ID] === undefined) {
-    res.send("error_DNE");
+    res.send("error the link does not exist");
   }
   if (req.session.user_id === undefined) {
-    res.send("error_login");
+    res.send("error please log in");
   }
   if (!users[req.session.user_id]) {
-    res.send("error_login");
+    res.send("error please log in");
   } else {
     delete urlDatabase[req.params.id];
   }
