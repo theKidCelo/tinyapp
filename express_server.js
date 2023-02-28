@@ -1,8 +1,9 @@
+const cookieSession = require("cookie-session");
 const express = require("express");
 const app = express();
 const PORT = 8080; // default port 8080
 const bcrypt = require("bcryptjs");
-const cookieSession = require("cookie-session");
+
 const {
   findUserByEmail,
   generateRandomString,
@@ -22,18 +23,17 @@ app.use(
 );
 
 const urlDatabase = {
-  b2xVn2: {
-    longURL: "http://www.lighthouselabs.ca",
-    userID: "userRandomID",
+  b6UTxQ: {
+    longURL: "https://www.tsn.ca",
+    userID: "aJ48lW",
   },
-
-  "9sm5xK": {
-    longURL: "http://www.google.com",
-    userID: "userRandomID",
+  i3BoGr: {
+    longURL: "https://www.google.ca",
+    userID: "aJ48lW",
   },
 };
-
-let users = {
+console.log(urlDatabase)
+const users = {
   userRandomID: {
     id: "userRandomID",
     email: "user@example.com",
@@ -47,27 +47,60 @@ let users = {
 };
 
 app.get("/", (req, res) => {
+  console.log(urlDatabase)
   res.redirect("/urls");
-})
+});
 
 app.get("/urls", (req, res) => {
-  let user = req.session.user_id;
-  console.log(users);
+  const userID = req.session.user_id;
+  const user = users[userID];
+  const templateVars = { user: user, urls: urlsForUser(userID) };
+  console.log(urlsForUser(userID))
+
+ if (!user) {
+    return res.redirect("/login");
+  }
+
+  return res.render("urls_index", templateVars);
+  /*
+  const userID = req.session.user_id;
+  const user = users[userID];
+
+ 
 
   const templateVars = {
     user: users[user],
     urls: urlsForUser(user, urlDatabase),
   };
 
-  console.log(templateVars.user);
-
   res.render("urls_index", templateVars);
+  */
 });
 
 app.get("/u/:id", (req, res) => {
+  const userID = req.session.user_id;
+  const user = users[userID];
+  const templateVars = { user: user };
+
+  // short link does not exist
+  if (!urlDatabase[req.params.shortURL]) {
+    return res.render("pages/urls_error_linkDNE", templateVars);
+  }
+
+  // The user can create a short link with http:// prefixed or not
+  // The code below is to accomodate this and to avoid errors upon redirecting
+  const regex = new RegExp("^http");
+  const longURLRedirect = urlDatabase[req.params.shortURL].longURL;
+
+  // Check if the longURL in the database starts with http://
+  if (regex.test(longURLRedirect)) {
+    return res.redirect(`${longURLRedirect}`);
+  } else {
+    return res.redirect(`http://${longURLRedirect}`);
+  }
+  /*
   let ID = req.params.id;
 
-  console.log(urlDatabase.ID);
   if (urlDatabase.ID == undefined) {
     res.send("error_DNE");
   }
@@ -78,23 +111,36 @@ app.get("/u/:id", (req, res) => {
   };
 
   res.redirect(longURL, templateVars);
+  */
 });
 
 app.get("/urls/new", (req, res) => {
-  console.log("new");
   const userID = req.session.user_id;
   const user = users[userID];
-  const templateVars = {
-    user: users[userID],
-    urls: urlsForUser(user, urlDatabase),
-    longURL: req.params.longURL
-  };
+  const templateVars = { user: user };
 
-  if (!templateVars.user) {
-    return res.render("login", templateVars);
+  if (!user) {
+    return res.redirect("/login");
   }
 
-  res.render("urls_new", templateVars);
+  return res.render("urls_new", templateVars);
+});
+
+app.post("/urls", (req, res) => {
+  const userID = req.session.user_id;
+  const user = users[userID];
+
+  if (!user) {
+    return res.redirect("/login");
+  }
+  console.log(urlDatabase)
+  const shortURL = generateRandomString();
+  urlDatabase[shortURL] = {};
+  urlDatabase[shortURL].longURL = req.body.longURL;
+  urlDatabase[shortURL].userID = userID;
+  console.log(urlDatabase)
+
+  return res.redirect(`/urls/${shortURL}`);
 });
 
 app.get("/urls/:id", (req, res) => {
@@ -121,32 +167,21 @@ app.get("/urls/:id", (req, res) => {
 app.post("/urls/:id", (req, res) => {
   const userID = req.session.user_id;
   const user = users[userID];
+  const URLsBelongingToUser = urlsForUser(userID, urlDatabase);
 
   const templateVars = { user };
 
-  urlDatabase[req.params.shortURL] = {
-    longURL: req.body.longURL,
-    userID,
-  };
+  if (!user || !URLsBelongingToUser) {
+    return res.render("pages/urls_error_linkOwner", templateVars);
+  } else {
+    urlDatabase[req.params.shortURL].longURL = req.body.longURL;
+    console.log(urlDatabase)
 
-  return res.redirect("/");
-});
-
-app.post("/urls", (req, res) => {
-  const userID = req.session.user_id;
-  const user = users[userID];
-
-  if (!user) {
-    return res.redirect("/login");
+    return res.redirect("/");
   }
-
-  const shortURL = generateRandomString();
-  urlDatabase[shortURL] = {};
-  urlDatabase[shortURL].longURL = req.body.longURL;
-  urlDatabase[shortURL].userID = userID;
-
-  return res.redirect(`/urls/${shortURL}`);
 });
+
+
 
 app.post("/urls/:id/delete", (req, res) => {
   let ID = req.params.id;
@@ -166,7 +201,6 @@ app.post("/urls/:id/delete", (req, res) => {
 });
 
 app.post("/urls/:id/update", (req, res) => {
-  console.log(req.body);
   urlDatabase[req.params.id].longURL = req.body.Link;
   res.redirect("/urls");
 });
@@ -203,7 +237,7 @@ app.post("/login", (req, res) => {
   }
 
   res.status(403);
-  return res.send("Password is incorrect, please try again.")
+  return res.send("Password is incorrect, please try again.");
 });
 
 app.post("/logout", (req, res) => {
@@ -227,10 +261,10 @@ app.get("/register", (req, res) => {
 app.post("/register", (req, res) => {
   if (req.body.email === "" || req.body.password === "") {
     res.status(400);
-    res.send("error_reg");
+    res.send("The form is empty please fill out the infomation");
   } else if (exisitingEmailLookup(req.body.email, users)) {
     res.status(400);
-    res.send("error_reg");
+    res.send("This email is already in our system!");
   } else {
     const password = req.body.password;
     const hashedPassword = bcrypt.hashSync(password, 10);
@@ -240,7 +274,6 @@ app.post("/register", (req, res) => {
       email: req.body.email,
       password: hashedPassword,
     };
-    console.log(users[userID].email);
     req.session.user_id = userID;
     res.redirect("/urls");
   }
