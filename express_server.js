@@ -3,7 +3,7 @@ const express = require("express");
 const app = express();
 const PORT = 8080; // default port 8080
 const bcrypt = require("bcryptjs");
-
+const {urlDatabase, users} = require("./database");
 const {
   findUserByEmail,
   generateRandomString,
@@ -21,43 +21,16 @@ app.use(
     keys: ["test"],
   })
 );
-
-const urlDatabase = {
-  b6UTxQ: {
-    longURL: "https://www.tsn.ca",
-    userID: "userRandomID",
-  },
-  i3BoGr: {
-    longURL: "https://www.google.ca",
-    userID: "user2RandomID",
-  },
-};
-console.log(urlDatabase)
-const users = {
-  userRandomID: {
-    id: "userRandomID",
-    email: "user@example.com",
-    password: "purple-monkey-dinosaur",
-  },
-  user2RandomID: {
-    id: "user2RandomID",
-    email: "user2@example.com",
-    password: "dishwasher-funk",
-  },
-};
-
 app.get("/", (req, res) => {
-  console.log(urlDatabase)
   res.redirect("/urls");
 });
 
 app.get("/urls", (req, res) => {
   const userID = req.session.user_id;
   const user = users[userID];
-  const templateVars = { user: user, urls: urlsForUser(userID, urlDatabase) };
-  console.log(urlsForUser(userID))
+  const templateVars = { user: user, urls: urlsForUser(userID, urlDatabase)};
 
- if (!user) {
+  if (!user) {
     return res.redirect("/login");
   }
 
@@ -68,16 +41,12 @@ app.get("/u/:id", (req, res) => {
   const userID = req.session.user_id;
   const user = users[userID];
   const templateVars = { user: user };
+  
 
+  const longURLRedirect = req.params.id
 
-  const regex = new RegExp("^http");
-  const longURLRedirect = urlDatabase[req.params.shortURL].longURL;
-
-  if (regex.test(longURLRedirect)) {
-    return res.redirect(`${longURLRedirect}`);
-  } else {
     return res.redirect(`http://${longURLRedirect}`);
-  }
+
 });
 
 app.get("/urls/new", (req, res) => {
@@ -100,6 +69,7 @@ app.post("/urls", (req, res) => {
     return res.redirect("/login");
   }
 
+  //adds new url to darabase
   const shortURL = generateRandomString();
   urlDatabase[shortURL] = {};
   urlDatabase[shortURL].longURL = req.body.longURL;
@@ -111,20 +81,27 @@ app.post("/urls", (req, res) => {
 app.get("/urls/:id", (req, res) => {
   let ID = req.params.id;
 
+  //security checks
+  //checks if it he link exists
   if (urlDatabase[ID] === undefined) {
     res.send("error this link does not exist");
   }
+  //checks to see if user is loged in or is the correct user
   if (users[req.session.user_id] === undefined) {
     res.send("error please login");
   }
   if (!users[req.session.user_id]) {
     res.send("error please login");
   }
+  if(urlDatabase[ID].userID !==  users[req.session.user_id].id){
+    res.send("error you do not have access")
+  }
+
   const templateVars = {
     id: req.params.id,
-    longURL: req.params.longURL,
+    longURL: req.body.longURL,
     user: users[req.session.user_id],
-
+    longURL: urlDatabase[ID].longURL
   };
 
   res.render("urls_show", templateVars);
@@ -140,38 +117,38 @@ app.post("/urls/:id", (req, res) => {
     shortURL: req.params.id,
     longURL: urlDatabase,
   };
-
+  
+  //checks to see if the urls belong to the user
   if (!user || !URLsBelongingToUser) {
-    return res.send("This link does not belong to user. please log in.")
+    return res.send("This link does not belong to user. please log in.");
   } else {
     urlDatabase[req.params.id].longURL = req.body.longURL;
-    console.log(urlDatabase)
 
     return res.redirect("/");
   }
 });
 
-
-
 app.post("/urls/:id/delete", (req, res) => {
   let ID = req.params.id;
 
+  //Security checks
+  //check to see if url id in database
   if (urlDatabase[ID] === undefined) {
     res.send("error the link does not exist");
   }
+  //checks to see if user is loged in or if correct user
   if (req.session.user_id === undefined) {
     res.send("error please log in");
   }
   if (!users[req.session.user_id]) {
     res.send("error please log in");
-  } else {
+  } 
+  if(urlDatabase[ID].userID !==  users[req.session.user_id].id){
+    res.send("error you do not have access")
+  }
+  else {
     delete urlDatabase[req.params.id];
   }
-  res.redirect("/urls");
-});
-
-app.post("/urls/:id/update", (req, res) => {
-  urlDatabase[req.params.id].longURL = req.body.Link;
   res.redirect("/urls");
 });
 
@@ -193,7 +170,9 @@ app.post("/login", (req, res) => {
   const hashedPassword = bcrypt.hashSync(formPassword, 10);
   const userEmail = req.body.email;
   const userPassword = req.body.password;
-
+  
+  //Security checks
+  //Checks if information has been filled
   if (userEmail === "" || userPassword === "") {
     res.status(400);
     return res.send("please fill in the form");
